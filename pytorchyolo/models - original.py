@@ -35,7 +35,7 @@ def create_modules(module_defs: List[dict]) -> Tuple[dict, nn.ModuleList]:
         'max_batches': int(hyperparams['max_batches']),
         'policy': hyperparams['policy'],
         'lr_steps': list(zip(map(int,   hyperparams["steps"].split(",")),
-                            map(float, hyperparams["scales"].split(","))))
+                             map(float, hyperparams["scales"].split(","))))
     })
     assert hyperparams["height"] == hyperparams["width"], \
         "Height and width should be equal! Non square images are padded with zeros."
@@ -62,7 +62,7 @@ def create_modules(module_defs: List[dict]) -> Tuple[dict, nn.ModuleList]:
             )
             if bn:
                 modules.add_module(f"batch_norm_{module_i}",
-                                    nn.BatchNorm2d(filters, momentum=0.1, eps=1e-5))
+                                   nn.BatchNorm2d(filters, momentum=0.1, eps=1e-5))
             if module_def["activation"] == "leaky":
                 modules.add_module(f"leaky_{module_i}", nn.LeakyReLU(0.1))
             elif module_def["activation"] == "mish":
@@ -220,8 +220,7 @@ class Darknet(nn.Module):
                 x = module[0](x, img_size)
                 yolo_outputs.append(x)
             layer_outputs.append(x)
-        #return yolo_outputs if self.training else torch.cat(yolo_outputs, 1)
-        return yolo_outputs
+        return yolo_outputs if self.training else torch.cat(yolo_outputs, 1)
 
     def load_darknet_weights(self, weights_path):
         """Parses and loads the weights stored in 'weights_path'"""
@@ -329,7 +328,7 @@ def load_model(model_path, weights_path=None):
     :rtype: Darknet
     """
     device = torch.device("cuda" if torch.cuda.is_available()
-                            else "cpu")  # Select device for inference
+                          else "cpu")  # Select device for inference
     model = Darknet(model_path).to(device)
 
     model.apply(weights_init_normal)
