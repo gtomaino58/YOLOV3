@@ -152,14 +152,31 @@ class YOLOLayer(nn.Module):
         self.stride = None
 
     def forward(self, x: torch.Tensor, img_size: int) -> torch.Tensor:
+        """
+        Forward pass of the YOLO layer
+
+        :param x: Input tensor
+        :param img_size: Size of the input image
+        """
         stride = img_size // x.size(2)
         self.stride = stride
-        bs, _, ny, nx = x.shape
+        bs, _, ny, nx = x.shape  # x(bs,255,20,20) to x(bs,3,20,20,85)
         x = x.view(bs, self.num_anchors, self.no, ny, nx).permute(0, 1, 3, 4, 2).contiguous()
 
-        # SIEMPRE devuelve tensor 5D, salvo que explícitamente quieras inferencia
-        return x
+        if not self.training:  # inference
+            if self.grid.shape[2:4] != x.shape[2:4]:
+                self.grid = self._make_grid(nx, ny).to(x.device)
 
+            if self.new_coords:
+                x[..., 0:2] = (x[..., 0:2] + self.grid) * stride  # xy
+                x[..., 2:4] = x[..., 2:4] ** 2 * (4 * self.anchor_grid) # wh
+            else:
+                x[..., 0:2] = (x[..., 0:2].sigmoid() + self.grid) * stride  # xy
+                x[..., 2:4] = torch.exp(x[..., 2:4]) * self.anchor_grid # wh
+                x[..., 4:] = x[..., 4:].sigmoid() # conf, cls
+            x = x.view(bs, -1, self.no)
+
+        return x
 
     @staticmethod
     def _make_grid(nx: int = 20, ny: int = 20) -> torch.Tensor:
@@ -171,20 +188,6 @@ class YOLOLayer(nn.Module):
         """
         yv, xv = torch.meshgrid([torch.arange(ny), torch.arange(nx)], indexing='ij')
         return torch.stack((xv, yv), 2).view((1, 1, ny, nx, 2)).float()
-    
-    @staticmethod
-    def yolo_inference(x, anchor_grid, grid, stride, new_coords=False):
-        # x: [bs, anchors, ny, nx, no]; anchor_grid, grid: shapes correctas
-        if new_coords:
-            x[..., 0:2] = (x[..., 0:2] + grid) * stride  # xy
-            x[..., 2:4] = x[..., 2:4] ** 2 * (4 * anchor_grid) # wh
-        else:
-            x[..., 0:2] = (x[..., 0:2].sigmoid() + grid) * stride  # xy
-            x[..., 2:4] = torch.exp(x[..., 2:4]) * anchor_grid # wh
-            x[..., 4:] = x[..., 4:].sigmoid() # conf, cls
-        bs = x.shape[0]
-        x = x.view(bs, -1, x.shape[-1])  # [bs, N, no]
-        return x
 
 
 class Darknet(nn.Module):
